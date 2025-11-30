@@ -2,29 +2,45 @@
 
 Python web crawler for extracting posts, comments, images, and audio from tuoitre.vn.
 
+Uses **Selenium WebDriver** to handle JavaScript-based pagination and dynamic content loading.
+
 ## Project Structure
 
 ```
-├── main.py                    # Entry point
-├── config.py                  # Configuration settings
-├── requirements.txt           # Dependencies
+├── main.py                           # Entry point
+├── config.py                         # Configuration settings
+├── requirements.txt                  # Dependencies
 ├── crawler/
 │   ├── __init__.py
-│   ├── category_crawler.py    # Crawl category pages
-│   ├── post_crawler.py        # Crawl individual posts
-│   └── comment_crawler.py     # Crawl comments
+│   ├── selenium_category_crawler.py  # Selenium-based category crawler
+│   ├── post_crawler.py               # Crawl individual posts
+│   └── comment_crawler.py            # Crawl comments
 └── utils/
     ├── __init__.py
-    ├── helpers.py             # Helper functions
-    ├── media_downloader.py    # Download images/audio
-    └── data_saver.py          # Save JSON/YAML files
+    ├── helpers.py                    # Helper functions
+    ├── media_downloader.py           # Download images/audio
+    └── data_saver.py                 # Save JSON/YAML files
 ```
 
 ## Installation
 
+### Prerequisites
+
+- Python 3.8+
+- Google Chrome browser (for Selenium WebDriver)
+
+### Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
+
+The following key dependencies will be installed:
+- `selenium` - Browser automation
+- `webdriver-manager` - Automatic Chrome driver management
+- `beautifulsoup4` - HTML parsing
+- `requests` - HTTP requests (for post/comment crawling)
+- `lxml` - Fast XML/HTML parser
 
 ## Usage
 
@@ -89,9 +105,30 @@ output/
 - `https://tuoitre.vn/giai-tri.htm` - Giải trí
 - `https://tuoitre.vn/giao-duc.htm` - Giáo dục
 
+## How It Works
+
+### JavaScript Pagination Handling
+
+The tuoitre.vn website uses JavaScript to load additional posts dynamically. Traditional HTTP requests to pagination URLs (like `/trang-2.htm`) return cached/identical content.
+
+This crawler uses **Selenium WebDriver** to:
+
+1. Launch a headless Chrome browser
+2. Load the category page and execute JavaScript
+3. Automatically scroll and click "Load More" (Xem thêm) buttons
+4. Extract post URLs from the fully rendered page
+5. Continue until the required number of posts is collected
+
+### Performance
+
+- **Category crawling**: Uses Selenium (slower but handles dynamic content)
+- **Post/comment crawling**: Uses standard HTTP requests (faster)
+- Collects **35+ posts per category** (vs ~28 with static requests)
+
 ## Notes
 
 - Respects website with 1.5-3s delays between requests
-- User-agent rotation to avoid blocking
+- Headless Chrome browser runs in background
+- Automatic Chrome driver management (no manual setup needed)
 - Retry logic for failed requests
-- Graceful error handling
+- Graceful error handling and cleanup

@@ -2,6 +2,7 @@
 """
 Web Crawler for tuoitre.vn
 Extracts posts, comments, images, and audio from specified categories
+Uses Selenium for JavaScript-based pagination
 
 Usage:
     python main.py
@@ -31,11 +32,11 @@ logger = logging.getLogger(__name__)
 
 
 class TuoitreCrawler:
-    """Main crawler orchestrator"""
-    
+    """Main crawler orchestrator using Selenium for JavaScript pagination"""
+
     def __init__(self, output_format: str = 'json'):
         self.session = requests.Session()
-        self.category_crawler = CategoryCrawler(self.session)
+        self.category_crawler = CategoryCrawler(headless=True)
         self.post_crawler = PostCrawler(self.session)
         self.comment_crawler = CommentCrawler(self.session)
         self.media_downloader = MediaDownloader(self.session)
@@ -56,49 +57,55 @@ class TuoitreCrawler:
     def crawl(self, categories: List[str], posts_per_category: int) -> None:
         """
         Main crawl method
-        
+
         Args:
             categories: List of category URLs to crawl
             posts_per_category: Number of posts to crawl per category
         """
         ensure_directories()
+
+        try:
+            # Step 1: Get all post URLs from categories
+            logger.info("=" * 60)
+            logger.info("STEP 1: Collecting post URLs from categories")
+            logger.info("Using Selenium for JavaScript-based pagination")
+            logger.info("=" * 60)
+
+            all_posts: List[Tuple[str, str]] = []  # (url, category)
+
+            for category_url in categories:
+                posts = self.category_crawler.get_posts_from_category(
+                    category_url,
+                    posts_per_category
+                )
+                all_posts.extend(posts)
+                logger.info(f"Collected {len(posts)} posts from {category_url}")
+
+            self.stats['total_posts'] = len(all_posts)
+            logger.info(f"Total posts to crawl: {self.stats['total_posts']}")
         
-        # Step 1: Get all post URLs from categories
-        logger.info("=" * 60)
-        logger.info("STEP 1: Collecting post URLs from categories")
-        logger.info("=" * 60)
-        
-        all_posts: List[Tuple[str, str]] = []  # (url, category)
-        
-        for category_url in categories:
-            posts = self.category_crawler.get_posts_from_category(
-                category_url, 
-                posts_per_category
-            )
-            all_posts.extend(posts)
-            logger.info(f"Collected {len(posts)} posts from {category_url}")
-            respectful_delay()
-        
-        self.stats['total_posts'] = len(all_posts)
-        logger.info(f"Total posts to crawl: {self.stats['total_posts']}")
-        
-        # Step 2: Crawl each post
-        logger.info("=" * 60)
-        logger.info("STEP 2: Crawling individual posts")
-        logger.info("=" * 60)
-        
-        for post_url, category in tqdm(all_posts, desc="Crawling posts"):
-            try:
-                self._process_post(post_url, category)
-                self.stats['successful_posts'] += 1
-            except Exception as e:
-                logger.error(f"Failed to process post {post_url}: {e}")
-                self.stats['failed_posts'] += 1
-            
-            respectful_delay()
-        
-        # Print summary
-        self._print_summary()
+            # Step 2: Crawl each post
+            logger.info("=" * 60)
+            logger.info("STEP 2: Crawling individual posts")
+            logger.info("=" * 60)
+
+            for post_url, category in tqdm(all_posts, desc="Crawling posts"):
+                try:
+                    self._process_post(post_url, category)
+                    self.stats['successful_posts'] += 1
+                except Exception as e:
+                    logger.error(f"Failed to process post {post_url}: {e}")
+                    self.stats['failed_posts'] += 1
+
+                respectful_delay()
+
+            # Print summary
+            self._print_summary()
+
+        finally:
+            # Cleanup Selenium
+            if hasattr(self.category_crawler, 'close'):
+                self.category_crawler.close()
     
     def _process_post(self, post_url: str, category: str) -> None:
         """Process a single post"""
@@ -223,7 +230,7 @@ Examples:
         action='store_true',
         help='Enable verbose logging'
     )
-    
+
     return parser.parse_args()
 
 
@@ -250,7 +257,7 @@ def main():
     logger.info(f"Categories: {categories}")
     logger.info(f"Posts per category: {args.posts_per_category}")
     logger.info(f"Output format: {args.format}")
-    
+
     # Create and run crawler
     crawler = TuoitreCrawler(output_format=args.format)
     crawler.crawl(categories, args.posts_per_category)
